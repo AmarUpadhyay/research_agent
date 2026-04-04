@@ -208,7 +208,7 @@
                         id="agentGoal"
                         placeholder="e.g., Find all users with status=active and log the count"
                         class="w-full h-10 px-3 rounded-lg border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 text-sm"
-                        value="Find all pending items in the database"
+                        value="Find order details for order ID 1"
                     >
                 </div>
 
@@ -931,11 +931,11 @@
         }
 
         document.getElementById('docsBtn').addEventListener('click', () => {
-            alert('Documentation is available in the README.md file. Auth endpoints:\n\nPOST /api/auth/signup\nPOST /api/auth/login\n\nAgent endpoints require Bearer token.');
+            window.open('https://github.com/AmarUpadhyay/research_agent/blob/main/README.md', '_blank', 'noopener,noreferrer');
         });
 
         document.getElementById('githubBtn').addEventListener('click', () => {
-            alert('GitHub repository link would go here. This is the Research Agent open-source project.');
+            window.open('https://github.com/AmarUpadhyay/research_agent.git', '_blank', 'noopener,noreferrer');
         });
     </script>
 </body>
