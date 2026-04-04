@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Agent - Autonomous AI Agent Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        /* Streaming text animation */
+        @keyframes typing {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+
+        @keyframes blink {
+            0%, 49% { border-color: #7C3AED; }
+            50%, 100% { border-color: transparent; }
+        }
+
+        .typing-cursor {
+            display: inline-block;
+            border-right: 2px solid #7C3AED;
+            animation: blink 1s step-end infinite;
+        }
+
+        .streaming-text {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stream-message {
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+
+        /* Dot pulse animation for typing indicator */
+        @keyframes pulse-dot {
+            0%, 60%, 100% { opacity: 0.3; }
+            30% { opacity: 1; }
+        }
+
+        .dot-pulse {
+            display: inline-block;
+            animation: pulse-dot 1.4s infinite;
+        }
+
+        .dot-pulse:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .dot-pulse:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        /* Smooth reveal animation */
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .reveal {
+            animation: slideUp 0.6s ease-out;
+        }
+
+        /* Hover effects */
+        .hover-lift {
+            transition: all 200ms ease-out;
+        }
+
+        .hover-lift:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(124, 58, 237, 0.1);
+        }
+
+        /* Minimal glass effect */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(124, 58, 237, 0.1);
+        }
+
+        /* Gradient text */
+        .gradient-text {
+            background: linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Respect prefers-reduced-motion */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-fuchsia-50 via-white to-cyan-50">
+    <!-- Navigation -->
+    <nav class="fixed top-4 left-4 right-4 z-40 max-w-6xl mx-auto">
+        <div class="glass-card px-6 py-3 rounded-full flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-purple-400 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v9a2 2 0 01-2 2h-4l-4 4v-4z"></path>
+                    </svg>
+                </div>
+                <span class="font-semibold text-slate-900">Research Agent</span>
+            </div>
+            <a href="#cta" class="px-4 py-2 rounded-lg text-sm font-medium text-purple-600 hover:bg-purple-100 transition-colors duration-200 cursor-pointer">
+                Try Now
+            </a>
+        </div>
+    </nav>
+
+    <!-- Auth Modal -->
+    <div id="authModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 p-4">
+        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-purple-100">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="authModalTitle" class="text-xl font-semibold text-slate-900">Sign in</h3>
+                <button id="authCloseBtn" class="text-slate-400 hover:text-slate-600 text-xl leading-none" aria-label="Close">
+                    &times;
+                </button>
+            </div>
+            <p class="text-sm text-slate-600 mb-4">Authentication is required to access agent endpoints.</p>
+
+            <div class="mb-4 grid grid-cols-2 gap-2 bg-slate-100 rounded-lg p-1">
+                <button id="loginTabBtn" class="auth-tab-btn rounded-md bg-white text-slate-900 text-sm font-medium py-2">Login</button>
+                <button id="signupTabBtn" class="auth-tab-btn rounded-md text-slate-600 text-sm font-medium py-2">Signup</button>
+            </div>
+
+            <div id="authError" class="hidden mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700"></div>
+
+            <form id="loginForm" class="space-y-3">
+                <input id="loginEmail" type="email" required placeholder="Email" class="w-full h-10 px-3 rounded-lg border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
+                <input id="loginPassword" type="password" required placeholder="Password" class="w-full h-10 px-3 rounded-lg border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
+                <button type="submit" class="w-full h-10 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700">
+                    Login
+                </button>
+            </form>
+
+            <form id="signupForm" class="hidden space-y-3">
+                <input id="signupName" type="text" placeholder="Name (optional)" class="w-full h-10 px-3 rounded-lg border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
+                <input id="signupEmail" type="email" required placeholder="Email" class="w-full h-10 px-3 rounded-lg border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
+                <input id="signupPassword" type="password" required minlength="8" placeholder="Password (min 8 chars)" class="w-full h-10 px-3 rounded-lg border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
+                <button type="submit" class="w-full h-10 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700">
+                    Create account
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
+        <div class="text-center reveal">
+            <div class="inline-block mb-6 px-3 py-1 rounded-full bg-purple-100 border border-purple-200">
+                <span class="text-sm font-medium text-purple-700">Autonomous AI Agent with Tools</span>
+            </div>
+
+            <h1 class="text-5xl sm:text-6xl font-bold text-slate-900 mb-6 leading-tight">
+                Intelligent Agents That <span class="gradient-text">Act & Decide</span>
+            </h1>
+
+            <p class="text-xl text-slate-600 mb-8 max-w-2xl mx-auto leading-relaxed">
+                Deploy autonomous AI agents that reason about goals, execute tools, and observe results. Built with Spring Boot, LangChain4j, and local LLM inference via Ollama.
+            </p>
+
+            <div class="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+                <a href="#cta" class="px-8 py-4 bg-gradient-to-r from-purple-600 to-purple-500 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-purple-500/30 transition-all duration-200 cursor-pointer inline-block">
+                    Try Now - It's Free
+                </a>
+                <a href="#features" class="px-8 py-4 border-2 border-purple-200 text-purple-700 font-semibold rounded-lg hover:bg-purple-50 transition-colors duration-200 cursor-pointer inline-block">
+                    View Features
+                </a>
+            </div>
+        </div>
+
+        <!-- Agent Execution Demo -->
+        <div class="glass-card rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto mt-16 reveal">
+            <div class="space-y-6">
+                <!-- Demo Header -->
+                <div class="border-b border-purple-100 pb-4">
+                    <h3 class="font-semibold text-slate-900">Agent Execution Demo</h3>
+                    <p class="text-xs text-slate-500 mt-1">POST /api/agent/tasks</p>
+                </div>
+
+                <!-- Request Input -->
+                <div class="space-y-3 bg-slate-50 p-4 rounded-lg">
+                    <label class="text-sm font-medium text-slate-700">Agent Goal:</label>
+                    <input
+                        type="text"
+                        id="agentGoal"
+                        placeholder="e.g., Find all users with status=active and log the count"
+                        class="w-full h-10 px-3 rounded-lg border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 text-sm"
+                        value="Find all pending items in the database"
+                    >
+                </div>
+
+                <!-- Execution Steps Display -->
+                <div class="space-y-3">
+                    <label class="text-sm font-medium text-slate-700">Execution Steps:</label>
+                    <div id="stepsContainer" class="h-64 overflow-y-auto space-y-2 bg-slate-50 p-3 rounded-lg text-xs font-mono">
+                        <div class="text-slate-500">Steps will appear here...</div>
+                    </div>
+                </div>
+
+                <!-- Result Display -->
+                <div class="space-y-3 bg-purple-50 p-4 rounded-lg">
+                    <label class="text-sm font-medium text-slate-700">Final Response:</label>
+                    <div id="finalResponse" class="text-sm text-slate-700 min-h-12 p-2 bg-white rounded border border-purple-200">
+                        Submit a goal to see the agent execute
+                    </div>
+                </div>
+
+                <!-- Control Buttons -->
+                <div class="flex gap-2">
+                    <button
+                        id="executeBtn"
+                        class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 cursor-pointer font-medium text-sm"
+                    >
+                        Execute Agent
+                    </button>
+                    <button
+                        id="healthBtn"
+                        class="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors duration-200 cursor-pointer font-medium text-sm"
+                    >
+                        Check Health
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-20 px-4 sm:px-6 lg:px-8 bg-white border-t border-purple-100">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-16 reveal">
+                <h2 class="text-4xl sm:text-5xl font-bold text-slate-900 mb-4">
+                    Built for Autonomous Decision Making
+                </h2>
+                <p class="text-lg text-slate-600 max-w-2xl mx-auto">
+                    Intelligent agents that reason about goals, execute tools, and deliver results
+                </p>
+            </div>
+
+            <!-- Feature Cards Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                <!-- Feature 1 -->
+                <div class="hover-lift group rounded-2xl glass-card p-8">
+                    <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-600 to-purple-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-900 mb-2">Autonomous Reasoning</h3>
+                    <p class="text-slate-600 text-sm">LLM-powered agents that understand goals and decide the best course of action without human intervention.</p>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="hover-lift group rounded-2xl glass-card p-8">
+                    <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-cyan-500 to-cyan-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.658 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-900 mb-2">Tool Integration</h3>
+                    <p class="text-slate-600 text-sm">Execute database queries, send notifications, and log events. Extensible tool system for custom actions.</p>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="hover-lift group rounded-2xl glass-card p-8">
+                    <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500 to-pink-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-900 mb-2">Observation & Iteration</h3>
+                    <p class="text-slate-600 text-sm">Agents observe tool results and iterate until goals are achieved. Full execution history for transparency.</p>
+                </div>
+
+                <!-- Feature 4 -->
+                <div class="hover-lift group rounded-2xl glass-card p-8">
+                    <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-cyan-600 to-blue-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-900 mb-2">Enterprise Grade</h3>
+                    <p class="text-slate-600 text-sm">Built with Spring Boot and Java. Type-safe API, error handling, and safety constraints prevent infinite loops.</p>
+                </div>
+
+                <!-- Feature 5 -->
+                <div class="hover-lift group rounded-2xl glass-card p-8">
+                    <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-600 to-blue-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-900 mb-2">Local LLM Support</h3>
+                    <p class="text-slate-600 text-sm">Powered by Ollama for local LLM inference. No external API calls, full data privacy, and cost-effective.</p>
+                </div>
+
+                <!-- Feature 6 -->
+                <div class="hover-lift group rounded-2xl glass-card p-8">
+                    <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-900 mb-2">REST API</h3>
+                    <p class="text-slate-600 text-sm">Full HTTP API for task execution, status checks, and step retrieval. Easy integration with any platform.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Integration Logos Section -->
+    <section class="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-slate-50 to-purple-50 border-t border-purple-100">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-12 reveal">
+                <h2 class="text-3xl font-bold text-slate-900 mb-2">
+                    Integrates with Your Favorite Tools
+                </h2>
+                <p class="text-slate-600">Connect to 500+ platforms out of the box</p>
+            </div>
+
+            <!-- Integration Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                <!-- Slack -->
+                <div class="glass-card rounded-lg p-6 flex items-center justify-center hover-lift cursor-pointer">
+                    <div class="text-center">
+                        <div class="w-10 h-10 mx-auto mb-2 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold">
+                            S
+                        </div>
+                        <p class="text-xs font-medium text-slate-700">Slack</p>
+                    </div>
+                </div>
+
+                <!-- Zendesk -->
+                <div class="glass-card rounded-lg p-6 flex items-center justify-center hover-lift cursor-pointer">
+                    <div class="text-center">
+                        <div class="w-10 h-10 mx-auto mb-2 rounded-lg bg-purple-600 flex items-center justify-center text-white font-bold">
+                            Z
+                        </div>
+                        <p class="text-xs font-medium text-slate-700">Zendesk</p>
+                    </div>
+                </div>
+
+                <!-- Salesforce -->
+                <div class="glass-card rounded-lg p-6 flex items-center justify-center hover-lift cursor-pointer">
+                    <div class="text-center">
+                        <div class="w-10 h-10 mx-auto mb-2 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">
+                            SF
+                        </div>
+                        <p class="text-xs font-medium text-slate-700">Salesforce</p>
+                    </div>
+                </div>
+
+                <!-- HubSpot -->
+                <div class="glass-card rounded-lg p-6 flex items-center justify-center hover-lift cursor-pointer">
+                    <div class="text-center">
+                        <div class="w-10 h-10 mx-auto mb-2 rounded-lg bg-orange-600 flex items-center justify-center text-white font-bold">
+                            H
+                        </div>
+                        <p class="text-xs font-medium text-slate-700">HubSpot</p>
+                    </div>
+                </div>
+
+                <!-- Intercom -->
+                <div class="glass-card rounded-lg p-6 flex items-center justify-center hover-lift cursor-pointer">
+                    <div class="text-center">
+                        <div class="w-10 h-10 mx-auto mb-2 rounded-lg bg-slate-800 flex items-center justify-center text-white font-bold">
+                            I
+                        </div>
+                        <p class="text-xs font-medium text-slate-700">Intercom</p>
+                    </div>
+                </div>
+
+                <!-- Zapier -->
+                <div class="glass-card rounded-lg p-6 flex items-center justify-center hover-lift cursor-pointer">
+                    <div class="text-center">
+                        <div class="w-10 h-10 mx-auto mb-2 rounded-lg bg-cyan-500 flex items-center justify-center text-white font-bold">
+                            Z
+                        </div>
+                        <p class="text-xs font-medium text-slate-700">Zapier</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases Section -->
+    <section class="py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-12 reveal">
+                <h2 class="text-4xl font-bold text-slate-900 mb-4">
+                    Real-World Agent Use Cases
+                </h2>
+                <p class="text-lg text-slate-600 max-w-2xl mx-auto">
+                    From data processing to automated workflows, deploy agents that scale
+                </p>
+            </div>
+
+            <!-- Use Cases Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Use Case 1 -->
+                <div class="rounded-xl border border-purple-100 p-8 hover-lift">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-slate-900 mb-2">Data Processing</h3>
+                            <p class="text-slate-600 text-sm">
+                                Agents query databases, analyze results, and take action. Perfect for ETL workflows, data validation, and automated reporting.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Use Case 2 -->
+                <div class="rounded-xl border border-cyan-100 p-8 hover-lift">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-lg bg-cyan-100 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-6 h-6 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-slate-900 mb-2">Automated Notifications</h3>
+                            <p class="text-slate-600 text-sm">
+                                Agents execute tasks and send emails to stakeholders. Great for alerts, summaries, and workflow notifications at scale.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Use Case 3 -->
+                <div class="rounded-xl border border-purple-100 p-8 hover-lift">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-slate-900 mb-2">Audit & Compliance</h3>
+                            <p class="text-slate-600 text-sm">
+                                Agents log actions and maintain full execution history. Perfect for compliance audits, debugging, and decision tracking.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Use Case 4 -->
+                <div class="rounded-xl border border-cyan-100 p-8 hover-lift">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-lg bg-cyan-100 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-6 h-6 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-slate-900 mb-2">Intelligent Workflows</h3>
+                            <p class="text-slate-600 text-sm">
+                                Deploy autonomous workflows that make decisions based on data. No code, no manual intervention, pure automation.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Social Proof Section -->
+    <section class="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-purple-50 to-slate-50 border-t border-purple-100">
+        <div class="max-w-6xl mx-auto text-center">
+            <p class="text-slate-600 font-medium mb-8">Trusted by leading companies</p>
+            <div class="flex flex-wrap items-center justify-center gap-8 text-slate-400">
+                <span class="font-semibold">TechCorp</span>
+                <span>•</span>
+                <span class="font-semibold">InnovateCo</span>
+                <span>•</span>
+                <span class="font-semibold">FutureScale</span>
+                <span>•</span>
+                <span class="font-semibold">DataFlow</span>
+                <span>•</span>
+                <span class="font-semibold">CloudNine</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section id="cta" class="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+        <!-- Decorative elements -->
+        <div class="absolute top-0 right-0 w-96 h-96 bg-purple-600 rounded-full blur-3xl opacity-20 -mr-48 -mt-48"></div>
+        <div class="absolute bottom-0 left-0 w-96 h-96 bg-cyan-600 rounded-full blur-3xl opacity-20 -ml-48 -mb-48"></div>
+
+        <div class="max-w-4xl mx-auto relative z-10 text-center">
+            <h2 class="text-5xl sm:text-6xl font-bold text-white mb-6">
+                Deploy Your <span class="gradient-text">Autonomous Agent</span>
+            </h2>
+
+            <p class="text-xl text-slate-200 mb-8 max-w-2xl mx-auto">
+                Start building intelligent agents that reason and act. Full source code, comprehensive documentation, and free tier available.
+            </p>
+
+            <div class="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+                <button
+                    id="githubBtn"
+                    class="px-8 py-4 rounded-lg bg-white/10 border border-white/20 text-white font-semibold hover:bg-white/20 transition-all duration-200 cursor-pointer whitespace-nowrap"
+                >
+                    View on GitHub
+                </button>
+                <button
+                    id="docsBtn"
+                    class="px-8 py-4 bg-gradient-to-r from-purple-600 to-purple-500 text-white font-semibold rounded-lg hover:shadow-xl hover:shadow-purple-500/40 transition-all duration-200 cursor-pointer whitespace-nowrap"
+                >
+                    Read Documentation
+                </button>
+            </div>
+
+            <p class="text-slate-400 text-sm">
+                ✓ Spring Boot + LangChain4j · ✓ Local LLM (Ollama) · ✓ PostgreSQL · ✓ 100% Open Source
+            </p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 px-4 sm:px-6 lg:px-8 bg-slate-900 border-t border-slate-800">
+        <div class="max-w-6xl mx-auto">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+                <div>
+                    <h4 class="font-semibold text-white mb-4">Product</h4>
+                    <ul class="space-y-2 text-slate-400 text-sm">
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">Features</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">Pricing</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">Security</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">Roadmap</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-white mb-4">Company</h4>
+                    <ul class="space-y-2 text-slate-400 text-sm">
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">About</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">Blog</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">Careers</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">Contact</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-white mb-4">Resources</h4>
+                    <ul class="space-y-2 text-slate-400 text-sm">
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">Docs</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">API Reference</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">Community</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">Status</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-white mb-4">Legal</h4>
+                    <ul class="space-y-2 text-slate-400 text-sm">
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">Privacy</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">Terms</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">Cookies</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors cursor-pointer">DPA</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="border-t border-slate-800 pt-12">
+                <div class="flex flex-col md:flex-row justify-between items-center">
+                    <div class="flex items-center gap-2 mb-6 md:mb-0">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-purple-400 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v9a2 2 0 01-2 2h-4l-4 4v-4z"></path>
+                            </svg>
+                        </div>
+                        <span class="font-semibold text-white">Research Agent</span>
+                    </div>
+                    <p class="text-slate-400 text-sm">© 2026 AI Chat Platform. All rights reserved.</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('reveal');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('h2, .hover-lift').forEach(el => {
+            observer.observe(el);
+        });
+
+        const API_BASE_URL = 'http://localhost:8080/api/agent';
+        const AUTH_BASE_URL = 'http://localhost:8080/api/auth';
+        const AUTH_STORAGE_KEY = 'research_agent_jwt';
+
+        class UnauthorizedError extends Error {
+            constructor(message = 'Unauthorized') {
+                super(message);
+                this.name = 'UnauthorizedError';
+            }
+        }
+
+        let authToken = localStorage.getItem(AUTH_STORAGE_KEY) || '';
+        let authPromiseResolver = null;
+        let authPromiseRejecter = null;
+        let authPendingPromise = null;
+
+        const authModal = document.getElementById('authModal');
+        const authModalTitle = document.getElementById('authModalTitle');
+        const authError = document.getElementById('authError');
+        const loginTabBtn = document.getElementById('loginTabBtn');
+        const signupTabBtn = document.getElementById('signupTabBtn');
+        const loginForm = document.getElementById('loginForm');
+        const signupForm = document.getElementById('signupForm');
+        const authCloseBtn = document.getElementById('authCloseBtn');
+
+        function setToken(token) {
+            authToken = token || '';
+            if (authToken) {
+                localStorage.setItem(AUTH_STORAGE_KEY, authToken);
+            } else {
+                localStorage.removeItem(AUTH_STORAGE_KEY);
+            }
+        }
+
+        function showAuthError(message) {
+            authError.textContent = message;
+            authError.classList.remove('hidden');
+        }
+
+        function clearAuthError() {
+            authError.textContent = '';
+            authError.classList.add('hidden');
+        }
+
+        function switchAuthMode(mode) {
+            const isLogin = mode === 'login';
+            loginForm.classList.toggle('hidden', !isLogin);
+            signupForm.classList.toggle('hidden', isLogin);
+            authModalTitle.textContent = isLogin ? 'Sign in' : 'Create account';
+            loginTabBtn.classList.toggle('bg-white', isLogin);
+            loginTabBtn.classList.toggle('text-slate-900', isLogin);
+            loginTabBtn.classList.toggle('text-slate-600', !isLogin);
+            signupTabBtn.classList.toggle('bg-white', !isLogin);
+            signupTabBtn.classList.toggle('text-slate-900', !isLogin);
+            signupTabBtn.classList.toggle('text-slate-600', isLogin);
+            clearAuthError();
+        }
+
+        function openAuthModal(mode = 'login') {
+            switchAuthMode(mode);
+            authModal.classList.remove('hidden');
+            authModal.classList.add('flex');
+
+            if (authPendingPromise) {
+                return authPendingPromise;
+            }
+
+            authPendingPromise = new Promise((resolve, reject) => {
+                authPromiseResolver = resolve;
+                authPromiseRejecter = reject;
+            });
+            return authPendingPromise;
+        }
+
+        function closeAuthModal(success) {
+            authModal.classList.add('hidden');
+            authModal.classList.remove('flex');
+            clearAuthError();
+
+            if (success && authPromiseResolver) {
+                authPromiseResolver(true);
+                authPromiseResolver = null;
+                authPromiseRejecter = null;
+                authPendingPromise = null;
+                return;
+            }
+
+            if (!success && authPromiseRejecter) {
+                authPromiseRejecter(new Error('Authentication cancelled'));
+                authPromiseResolver = null;
+                authPromiseRejecter = null;
+                authPendingPromise = null;
+            }
+        }
+
+        async function apiFetch(url, options = {}) {
+            const headers = { ...(options.headers || {}) };
+            if (authToken) {
+                headers.Authorization = `Bearer ${authToken}`;
+            }
+
+            const response = await fetch(url, { ...options, headers });
+            if (response.status === 401) {
+                setToken('');
+                throw new UnauthorizedError();
+            }
+            return response;
+        }
+
+        async function fetchWithAuthRetry(url, options = {}, mode = 'login') {
+            try {
+                return await apiFetch(url, options);
+            } catch (error) {
+                if (!(error instanceof UnauthorizedError)) {
+                    throw error;
+                }
+                await openAuthModal(mode);
+                return await apiFetch(url, options);
+            }
+        }
+
+        loginTabBtn.addEventListener('click', () => switchAuthMode('login'));
+        signupTabBtn.addEventListener('click', () => switchAuthMode('signup'));
+        authCloseBtn.addEventListener('click', () => closeAuthModal(false));
+
+        authModal.addEventListener('click', (event) => {
+            if (event.target === authModal) {
+                closeAuthModal(false);
+            }
+        });
+
+        loginForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            clearAuthError();
+
+            try {
+                const response = await fetch(`${AUTH_BASE_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: document.getElementById('loginEmail').value.trim(),
+                        password: document.getElementById('loginPassword').value
+                    })
+                });
+
+                const body = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(body.error || `Login failed (${response.status})`);
+                }
+
+                setToken(body.token);
+                closeAuthModal(true);
+            } catch (error) {
+                showAuthError(error.message);
+            }
+        });
+
+        signupForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            clearAuthError();
+
+            try {
+                const response = await fetch(`${AUTH_BASE_URL}/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: document.getElementById('signupName').value.trim() || null,
+                        email: document.getElementById('signupEmail').value.trim(),
+                        password: document.getElementById('signupPassword').value
+                    })
+                });
+
+                const body = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(body.error || `Signup failed (${response.status})`);
+                }
+
+                setToken(body.token);
+                closeAuthModal(true);
+            } catch (error) {
+                showAuthError(error.message);
+            }
+        });
+
+        document.getElementById('healthBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetchWithAuthRetry(`${API_BASE_URL}/health`, {}, 'login');
+                const data = await response.json();
+
+                const stepsContainer = document.getElementById('stepsContainer');
+                stepsContainer.innerHTML = `<div class="text-green-600 font-semibold">✓ Agent is UP and RUNNING</div><div class="text-xs text-slate-600">Status: ${data.status}</div>`;
+                document.getElementById('finalResponse').textContent = '✓ Service is healthy and ready to execute tasks!';
+            } catch (error) {
+                document.getElementById('stepsContainer').innerHTML = `<div class="text-red-600">✗ Connection Error: ${error.message}</div><div class="text-xs">Make sure the agent is running on localhost:8080</div>`;
+            }
+        });
+
+        document.getElementById('executeBtn').addEventListener('click', async () => {
+            const goal = document.getElementById('agentGoal').value.trim();
+
+            if (!goal) {
+                alert('Please enter an agent goal');
+                return;
+            }
+
+            const stepsContainer = document.getElementById('stepsContainer');
+            stepsContainer.innerHTML = '<div class="text-slate-500 animate-pulse">Submitting task to agent...</div>';
+
+            try {
+                const taskResponse = await fetchWithAuthRetry(`${API_BASE_URL}/tasks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task: goal })
+                }, 'login');
+
+                if (!taskResponse.ok) {
+                    throw new Error(`API Error: ${taskResponse.status}`);
+                }
+
+                const taskData = await taskResponse.json();
+                const taskId = taskData.id;
+
+                displaySteps(taskData);
+
+                if (taskData.status === 'RUNNING') {
+                    let pollCount = 0;
+                    const maxPolls = 30;
+
+                    const pollInterval = setInterval(async () => {
+                        pollCount++;
+
+                        try {
+                            const statusResponse = await fetchWithAuthRetry(`${API_BASE_URL}/tasks/${taskId}`, {}, 'login');
+                            const updatedTask = await statusResponse.json();
+                            displaySteps(updatedTask);
+
+                            if (updatedTask.status !== 'RUNNING' || pollCount >= maxPolls) {
+                                clearInterval(pollInterval);
+                            }
+                        } catch (error) {
+                            console.error('Poll error:', error);
+                            clearInterval(pollInterval);
+                        }
+                    }, 1000);
+                }
+            } catch (error) {
+                stepsContainer.innerHTML = `<div class="text-red-600 font-semibold">Error: ${error.message}</div><div class="text-xs mt-2">Make sure the agent is running on <code>localhost:8080</code></div>`;
+                document.getElementById('finalResponse').textContent = 'Failed to connect to agent';
+            }
+        });
+
+        function displaySteps(taskData) {
+            const stepsContainer = document.getElementById('stepsContainer');
+            const finalResponse = document.getElementById('finalResponse');
+            stepsContainer.innerHTML = '';
+
+            const statusColor = {
+                COMPLETED: 'text-green-600',
+                FAILED: 'text-red-600',
+                RUNNING: 'text-blue-600'
+            }[taskData.status] || 'text-slate-600';
+
+            stepsContainer.innerHTML += `<div class="font-semibold mb-2"><span class="${statusColor}">Status: ${taskData.status}</span></div>`;
+
+            if (taskData.steps && taskData.steps.length > 0) {
+                taskData.steps.forEach(step => {
+                    const typeColor = {
+                        PLAN: 'bg-blue-100 text-blue-800',
+                        ACTION: 'bg-purple-100 text-purple-800',
+                        OBSERVATION: 'bg-green-100 text-green-800',
+                        FINAL: 'bg-cyan-100 text-cyan-800',
+                        ERROR: 'bg-red-100 text-red-800'
+                    }[step.type] || 'bg-slate-100 text-slate-800';
+
+                    stepsContainer.innerHTML += `
+                        <div class="border-l-2 border-purple-300 pl-3 py-1">
+                            <div class="flex gap-2 items-start">
+                                <span class="text-xs font-semibold ${typeColor} px-2 py-0.5 rounded">${step.type}</span>
+                                <span class="text-xs text-slate-500">Step ${step.stepNumber}</span>
+                            </div>
+                            <div class="text-xs text-slate-700 mt-1 break-words">
+                                ${step.content.substring(0, 200)}${step.content.length > 200 ? '...' : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                stepsContainer.innerHTML = '<div class="text-slate-500">Waiting for agent to execute...</div>';
+            }
+
+            if (taskData.finalResponse) {
+                finalResponse.textContent = taskData.finalResponse;
+            } else if (taskData.status === 'RUNNING') {
+                finalResponse.textContent = '⏳ Agent is executing...';
+            } else {
+                finalResponse.textContent = taskData.finalResponse || 'No response yet';
+            }
+        }
+
+        document.getElementById('docsBtn').addEventListener('click', () => {
+            alert('Documentation is available in the README.md file. Auth endpoints:\n\nPOST /api/auth/signup\nPOST /api/auth/login\n\nAgent endpoints require Bearer token.');
+        });
+
+        document.getElementById('githubBtn').addEventListener('click', () => {
+            alert('GitHub repository link would go here. This is the Research Agent open-source project.');
+        });
+    </script>
+</body>
+</html>

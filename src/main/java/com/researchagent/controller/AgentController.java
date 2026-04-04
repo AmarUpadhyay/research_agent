@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Agent Controller - REST API endpoints for autonomous AI agent
+ * Handles task execution, status retrieval, and step history
+ */
 @RestController
 @RequestMapping("/api/agent")
 public class AgentController {
