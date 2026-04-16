@@ -84,6 +84,11 @@
             <artifactId>langchain4j-ollama</artifactId>
             <version>0.30.0</version>
         </dependency>
+        <dependency>
+            <groupId>io.modelcontextprotocol.sdk</groupId>
+            <artifactId>mcp</artifactId>
+            <version>1.1.0</version>
+        </dependency>
     </dependencies>
 
     <build>

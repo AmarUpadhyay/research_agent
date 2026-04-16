@@ -30,6 +30,12 @@ public interface TaskAgent {
         - Do not call logging for ordinary user-facing replies.
         - Do not repeat the same tool call unless the previous observation explicitly requires a retry.
         - When previous observations are sufficient, finish with FINAL.
+        - For the database tool, always send exact SQL in toolInput.sql.
+        - Database queries must be a single read-only PostgreSQL statement.
+        - Do not put semicolon ";" at the end of Database queries.
+        - Use schema context from the executor input to pick the exact table name and columns.
+        - Quote mixed-case table names such as public."User".
+        - For user listing tasks, prefer selecting id, name, and email from public."User" and avoid password unless explicitly requested.
         """)
     String decideNextAction(String executorInput);
 }

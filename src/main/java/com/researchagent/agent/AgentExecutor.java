@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 @Component
 public class AgentExecutor {
 
-    private static final int DEFAULT_MAX_STEPS = 5;
+    private static final int DEFAULT_MAX_STEPS = 10;
 
     private final TaskAgent taskAgent;
     private final InMemoryStore inMemoryStore;
@@ -92,14 +92,14 @@ public class AgentExecutor {
                 return task;
             }
 
-            if (isRepeatedToolCall(task, decision)) {
-                task.addStep(new AgentStep(stepNumber, AgentStepType.ERROR,
-                        "Repeated tool call blocked for tool '" + decision.getToolName() + "'.", null));
-                task.setStatus(AgentTaskStatus.FAILED);
-                task.setFinalResponse("Execution stopped because the agent repeated the same tool call without making progress.");
-                inMemoryStore.saveTask(task);
-                return task;
-            }
+//            if (isRepeatedToolCall(task, decision)) {
+//                task.addStep(new AgentStep(stepNumber, AgentStepType.ERROR,
+//                        "Repeated tool call blocked for tool '" + decision.getToolName() + "'.", null));
+//                task.setStatus(AgentTaskStatus.FAILED);
+//                task.setFinalResponse("Execution stopped because the agent repeated the same tool call without making progress.");
+//                inMemoryStore.saveTask(task);
+//                return task;
+//            }
 
             task.addStep(new AgentStep(stepNumber, AgentStepType.ACTION,
                     "Calling tool '" + tool.getName() + "' with input " + decision.getToolInput(), null));
@@ -123,6 +123,15 @@ public class AgentExecutor {
         builder.append("If the goal can be answered directly, return FINAL without using any tool.\n");
         builder.append("Do not use logging for ordinary conversational replies.\n");
         builder.append("Do not repeat the same successful tool call unless a retry is explicitly required.\n");
+        builder.append("When you use the database tool, generate a precise PostgreSQL query for reno_build and pass it in toolInput.sql.\n");
+        builder.append("Do not put \";\" at the end of database queries. For eg. SELECT order_id, customer_id, order_date, total_amount, order_status FROM public.orders\n");
+        builder.append("Refine the query based in the observation and take action");
+        builder.append("Use the MCP-provided schema context below to choose the exact table and columns.\n");
+        builder.append("First check the schema of reno_build and create query based on the task with reference of schema of reno_build only.\n");
+        builder.append("For requests about users,customers,orders, the default schema is reno_build\n");
+        builder.append("Do not select password from public.\"User\" unless the user explicitly asks for it.\n");
+        builder.append("If the user asks to list all users, a good query shape is SELECT \"id\", \"name\", \"email\" FROM public.\"User\" ORDER BY \"name\" NULLS LAST LIMIT 100.\n");
+        builder.append("If the request is ambiguous, use available schema context to pick the closest exact table instead of inventing one.\n");
         builder.append("Available tools:\n");
         for (AgentTool tool : toolsByName.values()) {
             builder.append("- ")

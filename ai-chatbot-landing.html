@@ -631,8 +631,8 @@
             observer.observe(el);
         });
 
-        const API_BASE_URL = 'http://localhost:8080/api/agent';
-        const AUTH_BASE_URL = 'http://localhost:8080/api/auth';
+        const API_BASE_URL = 'https://research-agent-be.amarup.co.in/api/agent';
+        const AUTH_BASE_URL = 'https://research-agent-be.amarup.co.in/api/auth';
         const AUTH_STORAGE_KEY = 'research_agent_jwt';
 
         class UnauthorizedError extends Error {
@@ -824,6 +824,7 @@
                 stepsContainer.innerHTML = `<div class="text-green-600 font-semibold">✓ Agent is UP and RUNNING</div><div class="text-xs text-slate-600">Status: ${data.status}</div>`;
                 document.getElementById('finalResponse').textContent = '✓ Service is healthy and ready to execute tasks!';
             } catch (error) {
+                console.log(error);
                 document.getElementById('stepsContainer').innerHTML = `<div class="text-red-600">✗ Connection Error: ${error.message}</div><div class="text-xs">Make sure the agent is running on localhost:8080</div>`;
             }
         });

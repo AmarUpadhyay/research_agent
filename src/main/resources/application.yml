@@ -24,11 +24,20 @@ ai:
 
 agent:
   database:
-    default-table: ${AGENT_DB_DEFAULT_TABLE:task_context}
-    default-search-column: ${AGENT_DB_SEARCH_COLUMN:content}
-    default-limit: ${AGENT_DB_DEFAULT_LIMIT:5}
+    default-limit: ${AGENT_DB_DEFAULT_LIMIT:100}
     schema-name: ${AGENT_DB_SCHEMA_NAME:public}
     schema-context-ttl-seconds: ${AGENT_DB_SCHEMA_TTL_SECONDS:60}
+    mcp:
+      command: ${AGENT_DB_MCP_COMMAND:java}
+      jar-path: ${AGENT_DB_MCP_JAR_PATH:postgres-readonly-mcp-server/target/postgres-readonly-mcp-server-1.0.0.jar}
+      request-timeout-seconds: ${AGENT_DB_MCP_REQUEST_TIMEOUT_SECONDS:20}
+      initialization-timeout-seconds: ${AGENT_DB_MCP_INITIALIZATION_TIMEOUT_SECONDS:20}
+      db-url: ${AGENT_DB_MCP_DB_URL:jdbc:postgresql://localhost:5432/reno_build}
+      db-username: ${AGENT_DB_MCP_DB_USERNAME:postgres}
+      db-password: ${AGENT_DB_MCP_DB_PASSWORD:admin}
+      allowed-schemas: ${AGENT_DB_MCP_ALLOWED_SCHEMAS:public}
+      max-rows: ${AGENT_DB_MCP_MAX_ROWS:100}
+      statement-timeout-seconds: ${AGENT_DB_MCP_STATEMENT_TIMEOUT_SECONDS:30}
 
 security:
   jwt:

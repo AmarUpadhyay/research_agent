@@ -4,27 +4,19 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.researchagent.model.ToolResult;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 @Component
 public class DatabaseTool implements AgentTool {
 
-    private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*$");
-
-    private final JdbcTemplate jdbcTemplate;
+    private final McpDatabaseClient mcpDatabaseClient;
     private final ObjectMapper objectMapper;
-    private final String defaultTable;
-    private final String defaultSearchColumn;
     private final int defaultLimit;
     private final String schemaName;
     private final int schemaContextTtlSeconds;
@@ -32,17 +24,13 @@ public class DatabaseTool implements AgentTool {
     private volatile long cachedSchemaContextAtMillis;
 
     public DatabaseTool(
-            JdbcTemplate jdbcTemplate,
+            McpDatabaseClient mcpDatabaseClient,
             ObjectMapper objectMapper,
-            @Value("${agent.database.default-table:task_context}") String defaultTable,
-            @Value("${agent.database.default-search-column:content}") String defaultSearchColumn,
-            @Value("${agent.database.default-limit:5}") int defaultLimit,
+            @Value("${agent.database.default-limit:100}") int defaultLimit,
             @Value("${agent.database.schema-name:public}") String schemaName,
             @Value("${agent.database.schema-context-ttl-seconds:60}") int schemaContextTtlSeconds) {
-        this.jdbcTemplate = jdbcTemplate;
+        this.mcpDatabaseClient = mcpDatabaseClient;
         this.objectMapper = objectMapper;
-        this.defaultTable = defaultTable;
-        this.defaultSearchColumn = defaultSearchColumn;
         this.defaultLimit = defaultLimit;
         this.schemaName = schemaName;
         this.schemaContextTtlSeconds = schemaContextTtlSeconds;
@@ -55,20 +43,19 @@ public class DatabaseTool implements AgentTool {
 
     @Override
     public String getDescription() {
-        return "Execute read-only SQL queries. Inputs: sql + params (preferred) or table + criteria.";
+        return "Execute exact read-only PostgreSQL queries through the MCP server. Input must include sql and may include limit.";
     }
 
     @Override
     public ToolResult execute(Map<String, Object> input) {
         try {
-            if (input != null && input.get("sql") != null) {
-                return runSqlQuery(input);
-            }
-            return runLookupQuery(input);
-        } catch (DataAccessException ex) {
-            return new ToolResult(getName(), false, "Database error: " + errorMessage(ex));
-        } catch (IllegalArgumentException ex) {
+            return runSqlQuery(input);
+        }
+        catch (IllegalArgumentException ex) {
             return new ToolResult(getName(), false, ex.getMessage());
+        }
+        catch (IllegalStateException ex) {
+            return new ToolResult(getName(), false, "Database MCP error: " + ex.getMessage());
         }
     }
 
@@ -81,100 +68,61 @@ public class DatabaseTool implements AgentTool {
         }
 
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                    """
-                            SELECT table_name, column_name, data_type, ordinal_position
-                            FROM information_schema.columns
-                            WHERE table_schema = ?
-                            ORDER BY table_name, ordinal_position
-                            """,
-                    schemaName
-            );
-
-            if (rows.isEmpty()) {
-                cachedSchemaContext = "No table metadata found in schema '" + schemaName + "'.";
+            Map<String, Object> health = mcpDatabaseClient.healthCheck();
+            List<Map<String, Object>> tables = mapList(mcpDatabaseClient.listTables(schemaName).get("tables"));
+            if (tables.isEmpty()) {
+                cachedSchemaContext = "No table metadata found in schema '" + schemaName + "' from the MCP database server.";
                 cachedSchemaContextAtMillis = now;
                 return cachedSchemaContext;
             }
 
-            Map<String, List<String>> byTable = new LinkedHashMap<>();
-            for (Map<String, Object> row : rows) {
-                String tableName = String.valueOf(row.get("table_name"));
-                String columnName = String.valueOf(row.get("column_name"));
-                String dataType = String.valueOf(row.get("data_type"));
-                byTable.computeIfAbsent(tableName, key -> new ArrayList<>())
-                        .add(columnName + " (" + dataType + ")");
+            List<String> tableSummaries = new ArrayList<>();
+            for (Map<String, Object> table : tables.stream()
+                    .sorted(Comparator.comparing(entry -> String.valueOf(entry.get("name"))))
+                    .toList()) {
+                String tableName = String.valueOf(table.get("name"));
+                Map<String, Object> details = mcpDatabaseClient.describeTable(schemaName, tableName);
+                List<Map<String, Object>> columns = mapList(details.get("columns"));
+                List<String> columnSummaries = columns.stream()
+                        .map(column -> column.get("name") + " (" + column.get("typeName") + ")")
+                        .toList();
+                tableSummaries.add(tableName + ": " + String.join(", ", columnSummaries));
             }
 
-            List<String> tableSummaries = byTable.entrySet().stream()
-                    .sorted(Comparator.comparing(Map.Entry::getKey))
-                    .map(entry -> entry.getKey() + ": " + String.join(", ", entry.getValue()))
-                    .toList();
-
-            cachedSchemaContext = "Schema '" + schemaName + "' tables -> " + String.join(" | ", tableSummaries);
+            cachedSchemaContext = "Database " + health.getOrDefault("database", "reno_build")
+                    + ", allowed schema '" + schemaName + "' -> "
+                    + String.join(" | ", tableSummaries)
+                    + ". For user lookups, the auth table is public.\"User\" with columns id, name, email, password. Do not select password unless the user explicitly asks for it.";
             cachedSchemaContextAtMillis = now;
             return cachedSchemaContext;
-        } catch (DataAccessException ex) {
-            return "Schema context unavailable: " + errorMessage(ex);
+        }
+        catch (RuntimeException ex) {
+            return "Schema context unavailable from MCP database server: " + ex.getMessage();
         }
     }
 
     private ToolResult runSqlQuery(Map<String, Object> input) {
         String sql = stringValue(input, "sql", "");
         if (sql.isBlank()) {
-            throw new IllegalArgumentException("Input 'sql' cannot be blank.");
+            throw new IllegalArgumentException("Database tool input must include a non-blank 'sql' field.");
         }
 
-        String trimmedSql = sql.trim();
-        if (!trimmedSql.toLowerCase().startsWith("select")) {
-            throw new IllegalArgumentException("Only SELECT queries are allowed.");
-        }
-
-        List<Object> params = objectList(input.get("params"));
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(trimmedSql, params.toArray());
-        return new ToolResult(getName(), true, formatRows(rows));
-    }
-
-    private ToolResult runLookupQuery(Map<String, Object> input) {
-        String table = stringValue(input, "table", defaultTable);
-        String criteria = stringValue(input, "criteria", "");
-        String searchColumn = stringValue(input, "column", defaultSearchColumn);
         int limit = intValue(input, "limit", defaultLimit);
-
-        validateIdentifier(table, "table");
-        validateIdentifier(searchColumn, "column");
         if (limit <= 0) {
             throw new IllegalArgumentException("Input 'limit' must be greater than 0.");
         }
 
-        String sql = "SELECT * FROM " + table + " WHERE " + searchColumn + " LIKE ? LIMIT ?";
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, "%" + criteria + "%", limit);
-        return new ToolResult(getName(), true, formatRows(rows));
+        Map<String, Object> response = mcpDatabaseClient.queryReadonly(sql, limit);
+        return new ToolResult(getName(), true, formatJson(response));
     }
 
-    private void validateIdentifier(String value, String fieldName) {
-        if (value == null || !IDENTIFIER_PATTERN.matcher(value).matches()) {
-            throw new IllegalArgumentException("Invalid " + fieldName + " value: " + value);
-        }
-    }
-
-    private String formatRows(List<Map<String, Object>> rows) {
-        if (rows.isEmpty()) {
-            return "No rows found.";
-        }
+    private String formatJson(Object value) {
         try {
-            return objectMapper.writeValueAsString(rows);
-        } catch (JsonProcessingException ex) {
-            return rows.toString();
+            return objectMapper.writeValueAsString(value);
         }
-    }
-
-    private String errorMessage(DataAccessException ex) {
-        Throwable cause = ex.getMostSpecificCause();
-        if (cause != null && cause.getMessage() != null && !cause.getMessage().isBlank()) {
-            return cause.getMessage();
+        catch (JsonProcessingException ex) {
+            return String.valueOf(value);
         }
-        return ex.getMessage() == null ? "Unknown database error." : ex.getMessage();
     }
 
     private String stringValue(Map<String, Object> input, String key, String fallback) {
@@ -199,13 +147,20 @@ public class DatabaseTool implements AgentTool {
         return Integer.parseInt(String.valueOf(value));
     }
 
-    private List<Object> objectList(Object value) {
-        if (value == null) {
-            return Collections.emptyList();
+    private List<Map<String, Object>> mapList(Object value) {
+        if (!(value instanceof List<?> list)) {
+            return List.of();
         }
-        if (value instanceof List<?> list) {
-            return new ArrayList<>(list);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Object item : list) {
+            if (item instanceof Map<?, ?> map) {
+                Map<String, Object> cast = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    cast.put(String.valueOf(entry.getKey()), entry.getValue());
+                }
+                result.add(cast);
+            }
         }
-        throw new IllegalArgumentException("Input 'params' must be a list.");
+        return result;
     }
 }
